@@ -1,0 +1,243 @@
+#include "raylib.h"
+#include <stdio.h>
+#include <stdbool.h>
+
+typedef enum {      //game mode
+    MENU,
+    EASY,
+    HARD
+} GameState;
+
+int main(void) {
+    int width = 512;
+    int height = 512;
+
+    InitWindow(width, height, "Brick Breaker");
+
+    GameState state = MENU;
+
+    // Paddle
+    int cb_x = width / 2 - 50;      //cb = "current bar"
+    int cb_y = height * 0.85;
+    int paddle_direction = 0;
+
+    // Ball
+    int ball_x, ball_y;
+    int ball_radius = 10;
+    int ball_velocity, ball_velocityx;
+
+    // Score & lives
+    int score = 0;
+    int lives = 3;
+
+    // Brick setup
+    int rows = 6;
+    int cols = 8;
+    int brick_width = 50;
+    int brick_height = 20;
+    int brick_spacing = 5;
+
+    bool bricks[6][8];
+    bool unbreakable[6][8];
+
+    // Colors for bricks
+    Color rowColors[6] = { RED, ORANGE, YELLOW, BLUE, PURPLE, GREEN };
+
+    // starting setup
+    ball_x = width / 2;
+    ball_y = height / 2;
+    ball_velocity = 4;
+    ball_velocityx = 0;
+
+    for (int r = 0; r < rows; r++) {
+        for (int c = 0; c < cols; c++) {
+            bricks[r][c] = true;
+            unbreakable[r][c] = false;
+        }
+    }
+
+    while (!WindowShouldClose()) {
+
+        // menu
+        if (state == MENU) {
+
+            if (IsKeyPressed(KEY_E)) {
+                state = EASY;
+
+                ball_x = width / 2;
+                ball_y = height / 2;
+                ball_velocity = 4;
+                ball_velocityx = 0;
+                score = 0;
+                lives = 3;
+
+                for (int r = 0; r < rows; r++) {
+                    for (int c = 0; c < cols; c++) {
+                        bricks[r][c] = true;
+                        unbreakable[r][c] = false;
+                    }
+                }
+            }
+
+            if (IsKeyPressed(KEY_H)) {
+                state = HARD;
+
+                ball_x = width / 2;
+                ball_y = height / 2;
+                ball_velocity = 6;
+                ball_velocityx = 0;
+                score = 0;
+                lives = 1;
+
+                for (int r = 0; r < rows; r++) {
+                    for (int c = 0; c < cols; c++) {
+                        bricks[r][c] = true;
+
+                        if (r == 2 && (c % 2 == 0)) {
+                            unbreakable[r][c] = true;
+                        } else {
+                            unbreakable[r][c] = false;
+                        }
+                    }
+                }
+            }
+
+            BeginDrawing();
+            ClearBackground(DARKBLUE);
+
+            DrawText("BRICK BREAKER", 120, 150, 30, WHITE);
+            DrawText("Press E - EASY", 150, 230, 20, LIGHTGRAY);
+            DrawText("Press H - HARD", 150, 270, 20, LIGHTGRAY);
+
+            EndDrawing();
+            continue;
+        }
+
+        // movement controls
+        if (IsKeyDown(KEY_RIGHT)) {
+            cb_x += 5;
+            paddle_direction = 1;
+        }
+        if (IsKeyDown(KEY_LEFT)) {
+            cb_x -= 5;
+            paddle_direction = -1;
+        }
+
+        // Keep paddle on screen
+        if (cb_x < 0) cb_x = 0;
+        if (cb_x + 100 > width) cb_x = width - 100;
+
+        // Ball movement
+        ball_y += ball_velocity;
+        ball_x += ball_velocityx;
+
+        // Paddle collision (FIXED)
+        if (ball_y + ball_radius >= cb_y &&
+            ball_y - ball_radius <= cb_y &&
+            ball_x >= cb_x &&
+            ball_x <= cb_x + 100 &&
+            ball_velocity > 0)
+        {
+            ball_velocity *= -1;
+
+            if (paddle_direction == 1) ball_velocityx = 3;
+            else if (paddle_direction == -1) ball_velocityx = -3;
+        }
+
+        //brick collision
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+
+                if (!bricks[r][c]) continue;
+
+                int bx = c * (brick_width + brick_spacing) + 20;
+                int by = r * (brick_height + brick_spacing) + 40;
+
+                if (ball_x + ball_radius >= bx &&
+                    ball_x - ball_radius <= bx + brick_width &&
+                    ball_y + ball_radius >= by &&
+                    ball_y - ball_radius <= by + brick_height)
+                {
+                    ball_velocity *= -1;
+
+                    if (!unbreakable[r][c]) {
+                        bricks[r][c] = false;
+                        score += 10;
+                    }
+                }
+            }
+        }
+
+        // Hard mode speed
+        if (state == HARD) {
+            if (ball_velocity < 6 && ball_velocity > 0) ball_velocity = 6;
+            if (ball_velocity > -6 && ball_velocity < 0) ball_velocity = -6;
+        }
+
+        // Walls
+        if (ball_y - ball_radius <= 0) {
+            ball_velocity *= -1;
+        }
+
+        if (ball_x - ball_radius <= 0 || ball_x + ball_radius >= width) {
+            ball_velocityx *= -1;
+        }
+
+        //lives 
+        if (ball_y > height) {
+            lives--;
+
+            ball_x = width / 2;
+            ball_y = height / 2;
+            ball_velocity = (state == HARD) ? 6 : 4;
+            ball_velocityx = 0;
+
+            // Reset paddle position
+            cb_x = width / 2 - 50;
+
+            if (lives <= 0) {
+                state = MENU;
+            }
+        }
+
+        // draw
+        BeginDrawing();
+        ClearBackground(DARKBLUE);
+
+        // Paddle
+        DrawRectangle(cb_x, cb_y, 100, 15, LIGHTGRAY);
+
+        // Ball
+        DrawCircle(ball_x, ball_y, ball_radius, WHITE);
+
+        // Bricks
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+
+                if (!bricks[r][c]) continue;
+
+                int bx = c * (brick_width + brick_spacing) + 20;
+                int by = r * (brick_height + brick_spacing) + 40;
+
+                Color color = rowColors[r];
+
+                if (unbreakable[r][c]) {
+                    DrawRectangle(bx, by, brick_width, brick_height, GRAY);
+                } else {
+                    DrawRectangle(bx, by, brick_width, brick_height, color);
+                }
+
+                DrawRectangleLines(bx, by, brick_width, brick_height, BLACK);
+            }
+        }
+
+        // UI
+        DrawText(TextFormat("Score: %d", score), 10, 10, 20, WHITE);
+        DrawText(TextFormat("Lives: %d", lives), 400, 10, 20, WHITE);
+
+        EndDrawing();
+    }
+
+    CloseWindow();
+    return 0;
+}
